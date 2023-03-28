@@ -1,0 +1,38 @@
+*{
+    box-sizing: border-box;
+}
+
+.popup{
+    font-size: 1.75em;
+    position: fixed;
+    left: 50%;
+        width: 70%;
+    transform: translate(-50%, 0);
+    margin: 0 0 -600px auto;
+    bottom: 10px;
+    font-family: 'Roboto', sans-serif;
+    background-color: rgb(55, 55, 55);
+}
+.popup::before{
+    font-size: 1.75em;
+    font-weight: 200;
+    content: "Q:";
+    text-align: center;
+    line-height: 120px;
+    float: left;
+    width: 120px;
+    height: 120px;
+    background-color: pink;
+    border-radius: 120px;
+    margin-left: -60px;
+    margin-top: -60px;
+    color: white;
+}
+.text{
+    color: white;
+    font-weight: 700;
+    box-sizing: border-box;
+    font-size: 1.4em;
+    padding-left: 80px;
+    padding-right: 20px;
+}
