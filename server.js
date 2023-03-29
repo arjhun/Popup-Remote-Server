@@ -1,22 +1,30 @@
-const express = require("express");
-const app = express();
-const http = require("http");
-var path = require("path");
-const storage = require("node-persist");
-const server = http.createServer(app);
-const { Server } = require("socket.io");
-const mongoose = require("mongoose");
-const { forEach } = require("node-persist");
-const { Schema } = mongoose;
+import express from "express";
+import { Server } from "socket.io";
+import mongoose, { Schema } from "mongoose";
+import * as dotenv from "dotenv";
+//middleware
+import ExpressBrute from "express-brute";
+import { validateRequest } from "zod-express-middleware";
+import { z } from "zod";
+import cors from "cors";
+//auth
+import jwt from "jsonwebtoken";
 //passwords
-const bcrypt = require("bcrypt");
-var generator = require("generate-password");
+import bcrypt from "bcrypt";
+import { generate } from "generate-password";
+import { createServer } from "http";
+
+dotenv.config();
+
+const app = express();
+const server = createServer(app);
 
 const questionSchema = new Schema({
   content: String,
   order: Number,
   fav: Boolean,
 });
+
 const Question = mongoose.model("questions", questionSchema);
 
 const sessionSchema = new Schema(
@@ -57,9 +65,12 @@ async function main() {
   const corsString = process.env.CORS_STR || "http://localhost:3000";
   //connect to mongoose
   await mongoose.connect(connectString);
-
-  if (!(await User.findOne({ username: "admin" }).exec())) {
-    var password = generator.generate({
+  console.log(process.env.RESET_ADMIN);
+  if (
+    process.env.RESET_ADMIN === "TRUE" ||
+    !(await User.findOne({ username: "admin" }).exec())
+  ) {
+    var password = generate({
       length: 16,
       numbers: true,
     });
@@ -67,7 +78,11 @@ async function main() {
       console.log(
         `Admin does not exsist! Creating first user with temporary password: ${password}`
       );
-      await User.create({ username: "admin", password: hash, role: "admin" });
+      await User.updateOne(
+        { username: "admin" },
+        { password: hash, role: "admin" },
+        { upsert: true }
+      );
     });
   }
 
@@ -82,25 +97,89 @@ async function main() {
 
   // serve the display endpoint
   console.log(`cors: ${corsString}`);
+
   server.listen(process.env.SERVERPORT || 3005, () => {
     console.log("listening on port 3005");
   });
 
-  app.use(express.static(path.join(__dirname, "public")));
+  app.use(express.static("public"));
+  app.use(express.json());
+  app.use(cors());
+
+  var store = new ExpressBrute.MemoryStore(); // stores state locally, don't use this in production
+  var bruteforce = new ExpressBrute(store);
 
   app.get("/", (req, res) => {
-    res.sendFile(__dirname + "public/index.html");
+    res.sendFile("index.html");
   });
 
-  //begin API for remote clients
+  app.post(
+    "/authenticate",
+    bruteforce.prevent,
+    validateRequest({
+      body: z.object({
+        username: z.string(),
+        password: z.string(),
+      }),
+    }),
+    async (req, res) => {
+      const { username, password } = req.body;
+      const user = await User.findOne({ username: username }).exec();
+      if (user) {
+        console.log(`User trying to login as: ${username}`);
+        bcrypt.compare(password, user.password, function (err, result) {
+          if (!result) {
+            res.sendStatus(401);
+          } else {
+            console.log(`Succesfully authenticated as: ${username}`);
+            console.log("Sending token!");
+            var token = jwt.sign(
+              { id: user._id, username: user.username },
+              process.env.SECRET_KEY,
+              { expiresIn: "1 day" }
+            );
+            res
+              .status(200)
+              .json({ username: user.username, role: user.role, token: token });
+          }
+          if (err) {
+          }
+        });
+      } else {
+        res.sendStatus("500");
+      }
+    }
+  );
 
-  //TODO: authentication
+  //begin socket.io API for remote clients
 
-  io.on("connection", (socket) => {
+  io.use(function (socket, next) {
+    if (socket.handshake.headers.clienttype === "endpoint") {
+      next();
+    }
+    if (socket.handshake.auth && socket.handshake.auth.token) {
+      console.log(socket.handshake.auth.token);
+      jwt.verify(
+        socket.handshake.auth.token,
+        process.env.SECRET_KEY,
+        function (err, decoded) {
+          if (err) return next(new Error("Authentication error"));
+          socket.decoded = decoded;
+          next();
+        }
+      );
+    } else {
+      next(new Error("Authentication error"));
+    }
+  });
+
+  io.on("connection", async (socket) => {
     console.log(
       `A user with id: ${socket.id} connected of type:${socket.handshake.headers.clienttype}`
     );
-
+    if (socket.handshake.headers.clienttype === "endpoint") {
+      socket.join("endpoint");
+    }
     socket.on("endpoint", () => {
       socket.join("endpoint");
       io.emit("endpointConnected", true);
@@ -214,7 +293,7 @@ async function main() {
 
     socket.on("showQuestion", (question) => {
       showing = question;
-      io.to("endpoint").emit("question", showing);
+      io.to("endpoint").emit("question", question);
       io.emit("questionStarted", question);
     });
 

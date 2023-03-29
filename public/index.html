@@ -39,7 +39,7 @@
     });
 
     socket.on('question', (question) => {
-
+      console.log(question);
           if(parseFloat($popup.css('marginBottom')) !== -600){
            $popup.stop(); 
            $popup.animate({marginBottom: '-600px'}, 500, ()=>{
