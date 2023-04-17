@@ -7,3 +7,4 @@ Dockerfile.prod
 .gitignore
 *-workspace
 README.MD
+.env*
