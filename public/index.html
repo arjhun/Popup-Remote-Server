@@ -23,37 +23,34 @@
   <script src="/socket.io/socket.io.js"></script>
 
   <script>
-  
-  const socket = io({
-    extraHeaders: {
-      "clientType": "endpoint"
-    }
-  });
-  
-  $(function() {
-    let $popup = $('.popup');
-    let $text = $popup.find('.text');
-    
-    socket.on('connect', () => {
-      socket.emit("endpoint");
-    });
 
-    socket.on('question', (question) => {
-      console.log(question);
-          if(parseFloat($popup.css('marginBottom')) !== -600){
-           $popup.stop(); 
-           $popup.animate({marginBottom: '-600px'}, 500, ()=>{
-            $text.text(question.content); 
-          $popup.animate({marginBottom: '50px'},1000);
-         });
-          }else{
-            $text.text(question.content); 
-            $popup.animate({marginBottom: '100px'},1000);
+                $(function () {
+                  let $popup = $('.popup');
+                  let $text = $popup.find('.text');
+
+                const socket = io({
+                  extraHeaders: {
+                    "clientType": "endpoint"
+                  }
+                });
+
+                socket.on('popup', (popup) => {
+                  console.log(popup);
+
+                if (parseFloat($popup.css('marginBottom')) !== -600) {
+                  $popup.stop();
+                $popup.animate({ marginBottom: '-600px' }, 500, () => {
+                  $text.text(popup.content);
+                  $popup.animate({ marginBottom: '50px' }, 1000);
+                });
+              } else {
+                $text.text(popup.content);
+                $popup.animate({ marginBottom: '100px' }, 1000);
           }
         });
-        socket.on('hide', function() {
-          socket.emit("questionStarted", null);
-          $popup.animate({marginBottom: '-600px'}, 500);
+                socket.on('hide', function () {
+                  socket.emit("popupStarted", null);
+                  $popup.animate({ marginBottom: '-600px' }, 500);
         });
 
     });
