@@ -1,18 +1,31 @@
+"use strict";
+
+import config from "./server.config.js";
+
+//logger
+import logger from "./logger.js";
+
+//db
+import mongoose from "mongoose";
+
+//servers
 import express from "express";
 import { Server } from "socket.io";
-import mongoose from "mongoose";
-import * as dotenv from "dotenv";
 import { createServer } from "http";
+
 //auth
 import jwt from "jsonwebtoken";
+
 //middleware
-import ExpressBrute from "express-brute";
-import { validateRequest } from "zod-express-middleware";
+import ExpressBruteFlexible from "rate-limiter-flexible/lib/ExpressBruteFlexible.js";
+import { validateRequest, processRequest } from "zod-express-middleware";
 import { z } from "zod";
+import { userSchema, passwordSchema } from "./UserApiSchemas.js";
 import cors from "cors";
 import { expressjwt } from "express-jwt";
-//db
+import * as lt from "long-timeout";
 
+//models and controllers
 import Session, {
   getSessions,
   addSession,
@@ -23,43 +36,50 @@ import Session, {
 } from "./Session.js";
 
 import User, {
-  ROLES,
   createUser,
   getUser,
   getUsers,
   updateUser,
   deleteUser,
+  activateUser,
+  ROLES,
   ROLES_VALUES,
-} from "./User.js";
-import { createDefaultAdmin, authenticate } from "./Auth.js";
+  changeRole,
+} from "./UserModel.js";
 
-dotenv.config();
+import {
+  createDefaultAdmin,
+  authenticate,
+  refresh,
+  verifyPassword,
+} from "./Auth.js";
+
+import { updatePasswordByToken, sendPasswordToken } from "./TokenModel.js";
+
+import { pinoHttp } from "pino-http";
+
+const reqLogger = pinoHttp({ logger: logger });
 
 const app = express();
 const server = createServer(app);
 
-const mongoConnectString =
-  process.env.CONN_STR || "mongodb://127.0.0.1:27017/questions";
-
 //connect to mongoose
 await mongoose
-  .connect(mongoConnectString)
+  .connect(config.db.connString)
   .then(() => {
-    console.log(`Connected to mongoose @ ${mongoConnectString}`);
+    logger.info(`Connected to mongoose @ ${config.db.connString}`);
     startServer().catch((error) => {
-      console.log(error);
+      logger.error(error);
     });
   })
-  .catch((err) => console.log(err));
+  .catch((err) => logger.fatal(err));
 
 async function startServer() {
-  let showing = null;
-
-  const corsString = process.env.CORS_STR || "http://localhost:3000";
+  let showing, lastPopup;
 
   if (
     !(await User.findOne({ username: "admin" }).exec()) ||
-    process.env.RESET_ADMIN === "TRUE"
+    config.auth.resetAdmin
   ) {
     createDefaultAdmin();
   }
@@ -67,32 +87,65 @@ async function startServer() {
   //Create socket.io server
   const io = new Server(server, {
     cors: {
-      origin: corsString.split(" "),
+      origin: config.server.corsUrls,
     },
   });
 
-  console.log(`cors: ${corsString}`);
+  logger.info(`cors origin set to: ${config.server.corsUrls}`);
 
   // serve the socket server;
-  server.listen(process.env.SERVERPORT || 3005, () => {
-    console.log("Socket.io listening on port 3005");
+  server.listen(config.socket.port, () => {
+    logger.info(`Socket.io listening on port ${config.socket.port}`);
   });
 
-  var store = new ExpressBrute.MemoryStore(); // stores state locally, don't use this in production
-  var bruteforce = new ExpressBrute(store, {
-    freeRetries: 5,
-  });
+  var bruteforce = new ExpressBruteFlexible(
+    ExpressBruteFlexible.LIMITER_TYPES.MEMORY,
+    { freeRetries: 10 }
+  );
 
+  //global middleware
+  app.use(reqLogger);
   app.use(express.static("public"));
   app.use(express.json());
   app.use(cors());
 
   app.use(
     expressjwt({
-      secret: process.env.SECRET_KEY,
+      secret: config.auth.secret,
       algorithms: ["HS256"],
-    }).unless({ path: ["/", "/authenticate"] })
+    }).unless({
+      path: ["/", "/authenticate", "/refresh", "/reset-password"],
+    })
   );
+
+  app.use(function (err, req, res, next) {
+    const date = new Date().toLocaleString();
+    if (err.name === "UnauthorizedError") {
+      logger.error(
+        `${date}: error: UnauthorizedError, method: ${req.method}, url: ${req.url} ,ip: ${req.ip}`
+      );
+      return res
+        .status(401)
+        .send("invalid token...Refresh token or contact your admin!");
+    }
+    next(err);
+  });
+
+  // custom middleware
+
+  const onlyAdmin = (req, res, next) => {
+    if (req.auth.role !== ROLES.ADMIN) return res.sendStatus(403);
+    next();
+  };
+
+  const onlyAdminAndOwner = (req, res, next) => {
+    if (req.auth.role !== ROLES.ADMIN) {
+      if (req.params.id !== req.auth.id) return res.sendStatus(403);
+    }
+    next();
+  };
+
+  //routes
 
   app.get("/", (req, res) => {
     res.sendFile("index.html");
@@ -100,7 +153,7 @@ async function startServer() {
 
   app.post(
     "/authenticate",
-    // bruteforce.prevent,
+    bruteforce.prevent,
     validateRequest({
       body: z.object({
         username: z.string(),
@@ -109,50 +162,48 @@ async function startServer() {
     }),
     authenticate
   );
-  // user api routes
 
-  const onlyAdmin = (req, res, next) => {
-    if (req.auth.role !== ROLES.ADMIN) res.sendStatus(403);
-    else next();
-  };
+  app.post(
+    "/refresh",
+    bruteforce.prevent,
+    validateRequest({
+      body: z.object({
+        refreshToken: z.string(),
+      }),
+    }),
+    refresh
+  );
 
-  const onlyAdminAndOwner = (req, res, next) => {
-    if (req.params.id !== req.auth.id) {
-      if (req.auth.role !== ROLES.ADMIN) res.sendStatus(403);
-    }
-    next();
-  };
+  app.post(
+    "/reset-password",
+    bruteforce.prevent,
+    validateRequest({
+      body: z.object({
+        email: z.string().email(),
+      }),
+    }),
+    sendPasswordToken
+  );
 
-  const onlyOwner = (req, res, next) => {
-    if (req.params.id !== req.auth.id) res.sendStatus(403);
-    else next();
-  };
-
-  const profileSchema = {
-    username: z.string().min(4),
-    firstName: z.string().min(2),
-    lastName: z.string().min(2),
-    email: z.string().email(),
-    password: z.optional(z.string().or(z.literal(""))),
-    newPassword: z.optional(
-      z
-        .string()
-        .regex(/^(?=.{8,20}$)(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?!.*\s).*/)
-        .or(z.literal(""))
-    ),
-  };
-
-  const userSchema = {
-    ...profileSchema,
-    role: z.enum(ROLES_VALUES).optional(),
-  };
+  app.put(
+    "/reset-password",
+    bruteforce.prevent,
+    validateRequest({
+      body: z.object({
+        token: z.string(),
+        tokenId: z.string(),
+        password: z.string(),
+      }),
+    }),
+    updatePasswordByToken
+  );
 
   app.get("/users", onlyAdmin, getUsers);
 
   app.post(
     "/users",
-    validateRequest({
-      body: z.object(userSchema),
+    processRequest({
+      body: z.object(userSchema).partial(),
     }),
     onlyAdmin,
     createUser
@@ -171,18 +222,39 @@ async function startServer() {
 
   app.put(
     "/users/:id",
-    (req, res, next) => {
-      console.log(req.body);
-      next();
-    },
-    validateRequest({
+    processRequest({
       params: z.object({
         id: z.string(),
       }),
-      body: z.object(profileSchema),
+      body: z.object({ ...userSchema, ...passwordSchema }).partial(),
     }),
     onlyAdminAndOwner,
+    verifyPassword,
     updateUser
+  );
+
+  app.put(
+    "/users/:id/active",
+    processRequest({
+      params: z.object({
+        id: z.string(),
+      }),
+      body: z.object({ active: z.boolean() }),
+    }),
+    onlyAdmin,
+    activateUser
+  );
+
+  app.put(
+    "/users/:id/role",
+    processRequest({
+      params: z.object({
+        id: z.string(),
+      }),
+      body: z.object({ role: z.enum(ROLES_VALUES) }),
+    }),
+    onlyAdmin,
+    changeRole
   );
 
   app.delete(
@@ -266,10 +338,17 @@ async function startServer() {
       if (socket.handshake.auth?.token) {
         jwt.verify(
           socket.handshake.auth.token,
-          process.env.SECRET_KEY,
+          config.auth.secret,
           function (err, decoded) {
             if (err) return next(new Error(err));
             socket.decoded = decoded;
+            //disconnect when jwt expires
+            const expiresIn = (decoded.exp - Date.now() / 1000) * 1000;
+            const timeout = lt.setTimeout(
+              () => socket.disconnect(true),
+              expiresIn
+            );
+            socket.on("disconnect", () => lt.clearTimeout(timeout));
             next();
           }
         );
@@ -280,7 +359,7 @@ async function startServer() {
   });
 
   io.on("connection", async (socket) => {
-    console.log(
+    logger.info(
       `A socket with id: ${socket.id} connected of type:${socket.handshake.headers.clienttype}`
     );
 
@@ -289,22 +368,21 @@ async function startServer() {
       haveEndpoints().then((state) => {
         socket.broadcast.emit("endpointConnected", state);
       });
-      if (showing != null) socket.emit("popup", showing);
     }
 
     if (socket.handshake.headers.clienttype === "remote") {
-      console.log(
+      logger.info(
         `Authenticated remote from user: ${socket.decoded?.username} connected`
       );
       haveEndpoints().then((state) => {
         socket.emit("endpointConnected", state);
       });
+      if (showing) socket.emit("popupStarted", lastPopup);
 
       socket.on("sortPopups", (sessionId, reducedArray, callBack) => {
         Session.findById(sessionId).then((session) => {
-          reducedArray.forEach((element) => {
-            let popup = session.popups.id(element._id);
-            popup.order = element.order;
+          reducedArray.forEach((popup) => {
+            session.popups.id(popup._id).order = popup.order;
           });
           session.save().then((session) => {
             callBack(true);
@@ -331,7 +409,6 @@ async function startServer() {
           .exec()
           .then((session) => {
             if (!session) return;
-            console.log("popup", data);
             let popup = session.popups.id(data._id);
             if (popup) {
               popup.set(data);
@@ -355,20 +432,28 @@ async function startServer() {
     }
 
     socket.on("showPopup", (popup) => {
-      showing = popup;
-      io.to("endpoint").emit("popup", showing);
-      io.emit("popupStarted", popup);
+      lastPopup = popup;
+      showing = true;
+      io.to("endpoint").emit("popup", lastPopup);
+      io.emit("popupStarted", lastPopup);
+    });
+
+    socket.on("repeatPopup", () => {
+      showing = true;
+      io.to("endpoint").emit("popup", lastPopup);
+      io.emit("popupStarted", lastPopup);
     });
 
     socket.on("hide", () => {
-      showing = null;
+      showing = false;
       io.to("endpoint").emit("hide");
       io.emit("popupStarted", null);
     });
 
     socket.on("disconnect", () => {
-      console.log(
-        `A user with id: ${socket.id} of type:${socket.handshake.headers.clienttype} disconnected!`
+      logger.info(
+        { socketId: socket.id, type: socket.handshake.headers.clienttype },
+        `A socket disconnected!`
       );
       haveEndpoints().then((state) => {
         socket.broadcast.emit("endpointConnected", state);
@@ -378,7 +463,6 @@ async function startServer() {
 
   async function haveEndpoints() {
     const sockets = await io.in("endpoint").fetchSockets();
-    console.log("endpoints:", sockets.length);
     return sockets.length > 0;
   }
 }
