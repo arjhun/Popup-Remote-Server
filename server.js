@@ -54,7 +54,10 @@ import {
   verifyPassword,
 } from "./Auth.js";
 
-import { updatePasswordByToken, sendPasswordToken } from "./TokenModel.js";
+import {
+  updatePasswordByToken,
+  sendPasswordToken,
+} from "./models/TokenModel.js";
 
 import { pinoHttp } from "pino-http";
 
