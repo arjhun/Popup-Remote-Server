@@ -1,9 +1,9 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
 import { randomBytes, createHash } from "crypto";
-import emailer from "./emailer.js";
+import emailer from "../emailer.js";
 import User from "./UserModel.js";
-import config from "./server.config.js";
+import config from "../server.config.js";
 
 const tokenSchema = new Schema({
   hash: {

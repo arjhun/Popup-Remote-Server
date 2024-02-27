@@ -20,7 +20,7 @@ import jwt from "jsonwebtoken";
 import ExpressBruteFlexible from "rate-limiter-flexible/lib/ExpressBruteFlexible.js";
 import { validateRequest, processRequest } from "zod-express-middleware";
 import { z } from "zod";
-import { userSchema, passwordSchema } from "./UserApiSchemas.js";
+import { userSchema, passwordSchema } from "./models/UserApiSchemas.js";
 import cors from "cors";
 import { expressjwt } from "express-jwt";
 import * as lt from "long-timeout";
@@ -33,7 +33,7 @@ import Session, {
   updateSession,
   deleteSession,
   orderPopups,
-} from "./Session.js";
+} from "./models/SessionModel.js";
 
 import User, {
   createUser,
@@ -45,7 +45,7 @@ import User, {
   ROLES,
   ROLES_VALUES,
   changeRole,
-} from "./UserModel.js";
+} from "./models/UserModel.js";
 
 import {
   createDefaultAdmin,

@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { generate } from "generate-password";
 //models
-import User, { ROLES } from "./UserModel.js";
+import User, { ROLES } from "./models/UserModel.js";
 
 export const refreshTokenStore = new Set();
 
