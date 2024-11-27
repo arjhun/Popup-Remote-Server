@@ -30,27 +30,39 @@ const options = {
 
 transporter.use("compile", hbs(options));
 
-// verify connection configuration
-transporter.verify(function (error, success) {
-  if (error)
-    logger.error(
-      { ...error },
-      "Connection to smtp server failed not able to send email!"
-    );
-  if (success) logger.info("SMTP server responded, ready to send email!");
-});
-
 // async..await is not allowed in global scope, must use a wrapper
 
 const emailer = {
+    /**
+   *A wrapper function
+   * @param {string} email
+   * @param {string} subject
+   * @param {string} template
+   * @param {object} context
+   */
+   sendEmailTo: async (email, subject, template, context = {}) => {
+    const from = `"${config.email.fromName}" <${config.email.fromEmail}>`,
+      mailOptions = {
+        from: from, // sender address
+        to: email, // list of receivers
+        subject: subject, // Subject line
+        template: template,
+        context: { subject: subject, email: email, ...context },
+      };
+     
+      transporter.sendMail(mailOptions, (err, info)=>{
+        if(err)logger.error({ template: template, error: err }, "Sending email failed!");
+        logger.trace(info);
+      });
+  },
   /**
    *
    * @param {string} name
    * @param {string} email
    * @param {string} reset_link
    */
-  sendPasswordResetMail: async (name, email, reset_link) => {
-    sendEmailTo(email, "Password Reset Requested", "reset_password", {
+  sendPasswordResetMail: async function (name, email, reset_link) {
+    this.sendEmailTo(email, "Password Reset Requested", "reset_password", {
       link: reset_link,
       name: name,
     });
@@ -58,47 +70,51 @@ const emailer = {
   /**
    *
    * @param {string} name
-   * @param {email} email
+   * @param {string} email
    */
-  sendResetNotifMail: async (name, email) => {
-    sendEmailTo(email, "password_change_notif", {
-      subject: "Security notification: Password reset!",
-      email: email,
-      context: {
+  sendResetNotifMail: async function (name, email) {
+    this.sendEmailTo(
+      email,
+      "Security notification: Password reset!",
+      "password_change_notif",
+      {
         name: name,
-      },
-    });
+      }
+    );
   },
   /**
    *
    * @param {string} email
    */
-  sendEmailNotFoundMail: async (email) => {
-    sendEmailTo(email, "Password Reset requested", "password_wrong_email");
+  sendEmailNotFoundMail: async function (email){
+    this.sendEmailTo(email, "Password Reset requested", "password_wrong_email");
   },
-};
-
-const from = `"${config.email.fromName}" <${config.email.fromEmail}>`;
-/**
- *
- * @param {string} email
- * @param {string} subject
- * @param {string} template
- * @param {object} context
- */
-const sendEmailTo = async (email, subject, template, context = {}) => {
-  try {
-    const info = await transporter.sendMail({
-      from: from, // sender address
-      to: email, // list of receivers
-      subject: subject, // Subject line
-      template: template,
-      context: { subject: subject, email: email, ...context },
+  /**
+   *
+   * @param {string} email
+   * @param {string} name
+   * @param {string} activation_link
+   */
+  sendEmailVerifyMail: async function(email, name, activation_link) {
+    this.sendEmailTo(email, "Welcome! Please activate your account!","verify_new_user", {
+      name: name,
+      link: activation_link,
     });
-    logger.trace(info);
-  } catch (err) {
-    logger.error({ template: template }, "Sending email failed!");
-  }
+  },
+  checkConnection: function () {
+    // verify connection configuration
+    transporter.verify(function (error, success) {
+      if (error)
+        logger.error(
+          { ...error },
+          "Connection to smtp server failed not able to send email!"
+        );
+      if (success) {
+        logger.info("SMTP server responded, ready to send email!");
+        return succes;
+      }
+    });
+  },
 };
 
 export default emailer;

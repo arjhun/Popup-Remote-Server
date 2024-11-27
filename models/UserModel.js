@@ -1,6 +1,7 @@
 import { Schema } from "mongoose";
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
+import emailer from "../emailer.js";
 
 export const ROLES = { MOD: "mod", ADMIN: "admin" };
 export const ROLES_VALUES = Object.values(ROLES);
@@ -39,6 +40,7 @@ const userSchema = new Schema(
       failedLogins: { type: Number, default: 0 },
       lastLoggin: Date,
       requireChange: { type: Boolean, default: true },
+      isVerified: { type: Boolean, default: false },
     },
     active: { type: Boolean, default: true },
   },
@@ -50,7 +52,12 @@ const User = mongoose.model("users", userSchema);
 export const createUser = async (req, res) => {
   User.create(req.body)
     .then((newUser) => {
-      if (newUser) res.status(201).json(newUser);
+      res.status(201).json(newUser);
+      emailer.sendEmailVerifyMail(
+        newUser.email,
+        newUser.firstName || newUser.username,
+        "this_is_a_link"
+      );
     })
     .catch((err) => {
       console.log(err.code);

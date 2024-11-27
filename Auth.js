@@ -31,6 +31,9 @@ export const createDefaultAdmin = async () => {
         email: "admin@example.org",
         password: hash,
         role: ROLES.ADMIN,
+        authInfo: {
+          isVerified: true,
+        },
       },
       { upsert: true }
     )
@@ -89,18 +92,24 @@ export const authenticate = async (req, res) => {
     .exec()
     .then((user) => {
       const logObj = { user_id: user._id, username: user.username, ip: req.ip };
-      if (!user?.active) {
-        logger.info(logObj, `Login attempt by deactivated user`);
-        return res.sendStatus(401);
-      }
       bcrypt.compare(password, user.password, function (err, result) {
         if (!result) {
-          // user.authInfo.failedLogins += 1;
+          user.authInfo.failedLogins += 1;
           logger.warn(logObj, `Failed login attempt`);
           return res.sendStatus(401);
         }
-        //user.authInfo.failedLogins = 0;
+
+        user.authInfo.failedLogins = 0;
         user.authInfo.lastLoggin = Date.now();
+
+        if (!user.authInfo?.isVerified) {
+          logger.info(logObj, `Login attempt by non verified user`);
+          return res.sendStatus(401);
+        }
+        if (!user?.active) {
+          logger.info(logObj, `Login attempt by deactivated user`);
+          return res.sendStatus(401);
+        }
         logger.info(logObj, `Successfully authenticated`);
         const tokens = createTokens(user);
         return res.status(201).json(tokens);
