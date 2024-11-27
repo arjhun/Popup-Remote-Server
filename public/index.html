@@ -13,7 +13,10 @@
 <body>
     <div class="root">
     <div class="popup">
-       <p class="text"></p>
+      <div class="popupContent">
+        <p id="title"></p>
+        <p id="content"></p>
+      </div>
     </div>    
     </div>
     <script
@@ -21,41 +24,6 @@
   integrity="sha256-pvPw+upLPUjgMXY0G+8O0xUf+/Im1MZjXxxgOcBQBXU="
   crossorigin="anonymous"></script>
   <script src="/socket.io/socket.io.js"></script>
-
-  <script>
-
-                $(function () {
-                  let $popup = $('.popup');
-                  let $text = $popup.find('.text');
-
-                const socket = io({
-                  extraHeaders: {
-                    "clientType": "endpoint"
-                  }
-                });
-
-                socket.on('popup', (popup) => {
-                  console.log(popup);
-
-                if (parseFloat($popup.css('marginBottom')) !== -600) {
-                  $popup.stop();
-                $popup.animate({ marginBottom: '-600px' }, 500, () => {
-                  $text.text(popup.content);
-                  $popup.animate({ marginBottom: '50px' }, 1000);
-                });
-              } else {
-                $text.text(popup.content);
-                $popup.animate({ marginBottom: '100px' }, 1000);
-          }
-        });
-                socket.on('hide', function () {
-                  socket.emit("popupStarted", null);
-                  $popup.animate({ marginBottom: '-600px' }, 500);
-        });
-
-    });
-
-    
-  </script>
+  <script src="/js/popup.js"></script>
 </body>
 </html>
