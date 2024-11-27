@@ -21,10 +21,7 @@ const config = {
   socket: { port: process.env.SERVERPORT || 3005 },
   auth: {
     secret: process.env.SECRET_KEY, //* please use an enviroment variable
-    resetAdmin:
-      process.env.RESET_ADMIN === "TRUE" ||
-      process.env.RESET_ADMIN === "true" ||
-      false,
+    resetAdmin: process.env.RESET_ADMIN.toLowerCase() === "true" || false,
     accessTokenExpiration: "1 day",
     refreshTokenExpiration: "30 days",
   },
