@@ -113,7 +113,12 @@ export const updateUser = async (req, res) => {
     });
 };
 
-export const deleteUser = async (req, res) => {};
+export const deleteUser = async (req, res) => {
+  await User.findByIdAndDelete(req.params.id).then((user) => {
+    if (user) res.status(200).json(user);
+    else res.sendStatus(404);
+  });
+};
 
 export const activateUser = async (req, res) => {
   User.findByIdAndUpdate(req.params.id, { active: req.body.active })
