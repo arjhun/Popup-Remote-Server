@@ -6,7 +6,10 @@
     "type": "module",
     "scripts": {
         "start": "node server.js",
-        "dev": "nodemon server.js | pino-pretty --colorize"
+        "dev": "nodemon server.js",
+        "dev-pretty": "nodemon server.js | pino-pretty --colorize",
+        "test": "vitest",
+        "coverage": "vitest run --coverage"
     },
     "dependencies": {
         "@thream/socketio-jwt": "^3.1.3",
