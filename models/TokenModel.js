@@ -79,7 +79,7 @@ export const updatePasswordByToken = async (req, res) => {
             res.sendStatus(200);
           });
         //send the user a notification email
-        emailer.sendResetNotifMail(user.firstName | user.username, user.email);
+        emailer.sendResetNotifMail(user.firstName || user.username, user.email);
       });
   } catch (err) {
     console.log(err);
