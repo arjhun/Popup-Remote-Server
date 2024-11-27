@@ -368,6 +368,7 @@ async function startServer() {
 
     if (socket.handshake.headers.clienttype === "endpoint") {
       await socket.join("endpoint");
+      if (showing) io.to("endpoint").emit("popup", lastPopup);
       haveEndpoints().then((state) => {
         socket.broadcast.emit("endpointConnected", state);
       });
