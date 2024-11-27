@@ -5,7 +5,10 @@ dotenv.config();
 const config = {
   env: process.env.NODE_ENV || "development",
   log: {
-    logLevel: process.env.NODE_ENV === "production" ? "warn" : "trace",
+    logLevel:
+      process.env.NODE_ENV === "production"
+        ? process.env.PROD_LOGLEVEL || "info"
+        : process.env.DEV_LOGLEVEL || "trace",
   },
   db: {
     connString: process.env.CONN_STR || "mongodb://127.0.0.1:27017/popups",
