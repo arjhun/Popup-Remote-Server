@@ -5,6 +5,7 @@ const popupSchema = new Schema(
     content: String,
     order: Number,
     fav: Boolean,
+    title: String,
     type: {
       type: String,
       enum: POPUPS,
