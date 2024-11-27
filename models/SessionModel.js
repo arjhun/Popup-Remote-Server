@@ -1,4 +1,5 @@
 import mongoose, { Schema } from "mongoose";
+import logger from "../logger";
 const POPUPS = ["default", "question", "tip"];
 const popupSchema = new Schema(
   {
@@ -69,7 +70,7 @@ export const getSession = async (req, res) => {
       else res.sendStatus(404);
     })
     .catch((error) => {
-      console.log(error);
+      logger.error(error);
       res.sendStatus(500);
     });
 };

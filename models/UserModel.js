@@ -2,6 +2,7 @@ import { Schema } from "mongoose";
 import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import emailer from "../emailer.js";
+import logger from "../logger.js";
 
 export const ROLES = { MOD: "mod", ADMIN: "admin" };
 export const ROLES_VALUES = Object.values(ROLES);
@@ -60,7 +61,7 @@ export const createUser = async (req, res) => {
       );
     })
     .catch((err) => {
-      console.log(err.code);
+      logger.error(err.code);
       if (err.code == 11000) return res.status(409).json(err.keyValue);
     });
 };
@@ -84,7 +85,7 @@ export const getUser = async (req, res) => {
       }
     })
     .catch((err) => {
-      console.log(err);
+      logger.error(err);
       res.sendStatus(500);
     });
 };
@@ -131,7 +132,7 @@ export const activateUser = async (req, res) => {
       }
     })
     .catch((err) => {
-      console.log(err);
+      logger.error(err);
       res.sendStatus(500);
     });
 };
@@ -149,7 +150,7 @@ export const changeRole = async (req, res) => {
       }
     })
     .catch((err) => {
-      console.log(err);
+      logger.error(err);
       res.sendStatus(500);
     });
 };

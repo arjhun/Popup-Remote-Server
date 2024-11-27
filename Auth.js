@@ -126,10 +126,6 @@ export const refresh = async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, config.auth.secret);
-
-    // if (!refreshTokenStore.delete(token)) throw "RefreshToken does not exist";
-    // else console.log("tokens in refreshtokenset: ", refreshTokenStore.size);
-
     User.findById(decoded.id)
       .exec()
       .then((user) => {
@@ -149,7 +145,7 @@ export const refresh = async (req, res) => {
         res.sendStatus("401");
       });
   } catch (err) {
-    console.log(err);
+    logger.error(err);
     return res.sendStatus(401);
   }
 };

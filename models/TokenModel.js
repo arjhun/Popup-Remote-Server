@@ -53,14 +53,13 @@ export const sendPasswordToken = async (req, res) => {
       reset_link
     );
   } catch (err) {
-    console.log(err);
+    logger.error(err);
   }
 };
 
 export const updatePasswordByToken = async (req, res) => {
   try {
     //get token
-    console.log(req.body);
     const token = await Token.findById(req.body.tokenId).exec();
     if (!token) return res.sendStatus(404);
     await User.findById(token.userId)
@@ -82,7 +81,7 @@ export const updatePasswordByToken = async (req, res) => {
         emailer.sendResetNotifMail(user.firstName || user.username, user.email);
       });
   } catch (err) {
-    console.log(err);
+    logger.error(err);
     res.sendStatus(500);
   }
 
