@@ -48,7 +48,7 @@ export const sendPasswordToken = async (req, res) => {
       `/login/password-reset?token=${token}&tokenId=${createdToken._id}`;
 
     await emailer.sendPasswordResetMail(
-      user.firstName ? user.firstName : user.username,
+      user.firstName || user.username,
       user.email,
       reset_link
     );
