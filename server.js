@@ -61,7 +61,7 @@ import {
 
 import { pinoHttp } from "pino-http";
 
-const reqLogger = pinoHttp({ logger: logger });
+const reqLogger = pinoHttp({ logger: logger, useLevel: "debug" });
 
 const app = express();
 const server = createServer(app);
