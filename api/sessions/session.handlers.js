@@ -1,41 +1,5 @@
-import mongoose, { Schema } from "mongoose";
-import logger from "../logger";
-const POPUPS = ["default", "question", "tip"];
-const popupSchema = new Schema(
-  {
-    content: String,
-    order: Number,
-    fav: Boolean,
-    title: String,
-    type: {
-      type: String,
-      enum: POPUPS,
-      default: "default",
-    },
-  },
-  { timestamps: true }
-);
-
-const sessionSchema = new Schema(
-  {
-    title: String,
-    popups: { type: [popupSchema], default: [] },
-  },
-  {
-    timestamps: true,
-    toObject: { virtuals: true, getters: true },
-    toJSON: { virtuals: true, getters: true },
-  }
-);
-
-sessionSchema.virtual("popupCount", {
-  count: true,
-  ref: "sessions.popups",
-  localField: "_id",
-  foreignField: "_id",
-});
-
-const Session = mongoose.model("sessions", sessionSchema);
+import logger from "../../logger.js";
+import Session from "./session.model.js";
 
 export const getSessions = async (req, res) => {
   await Session.aggregate()
@@ -45,11 +9,15 @@ export const getSessions = async (req, res) => {
         $size: { $ifNull: ["$popups", []] },
       },
     })
-    .project("-popups")
+    .project({ popups: 0 })
     .sort({ updatedAt: "desc" })
-    .then((data) => {
-      delete data.popups;
-      res.status(200).json(data);
+    .exec()
+    .then((sessions) => {
+      res.status(200).json(sessions);
+    })
+    .catch((error) => {
+      logger.error(error);
+      res.sendStatus(500);
     });
 };
 
@@ -59,6 +27,7 @@ export const addSession = async (req, res) => {
       res.status(201).json(session);
     })
     .catch((error) => {
+      logger.error(error);
       res.sendStatus(500);
     });
 };
@@ -99,5 +68,3 @@ export const deleteSession = async (req, res) => {
     else res.sendStatus(404);
   });
 };
-
-export default Session;

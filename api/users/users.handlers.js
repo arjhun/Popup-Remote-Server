@@ -1,54 +1,6 @@
-import { Schema } from "mongoose";
-import mongoose from "mongoose";
-import bcrypt from "bcrypt";
-import emailer from "../emailer.js";
-import logger from "../logger.js";
-
-export const ROLES = { MOD: "mod", ADMIN: "admin" };
-export const ROLES_VALUES = Object.values(ROLES);
-
-const userSchema = new Schema(
-  {
-    firstName: {
-      type: String,
-    },
-    lastName: {
-      type: String,
-    },
-
-    email: {
-      type: String,
-      unique: true,
-      required: true,
-    },
-    username: {
-      type: String,
-      unique: true,
-      required: true,
-    },
-    password: {
-      required: true,
-      type: String,
-      select: false,
-    },
-    role: {
-      type: String,
-      required: true,
-      enum: ROLES_VALUES,
-      default: ROLES.MOD,
-    },
-    authInfo: {
-      failedLogins: { type: Number, default: 0 },
-      lastLoggin: Date,
-      requireChange: { type: Boolean, default: true },
-      isVerified: { type: Boolean, default: false },
-    },
-    active: { type: Boolean, default: true },
-  },
-  { timestamps: true }
-);
-
-const User = mongoose.model("users", userSchema);
+import emailer from "../../emailer.js";
+import logger from "../../logger.js";
+import User from "./users.model.js";
 
 export const createUser = async (req, res) => {
   User.create(req.body)
@@ -78,11 +30,8 @@ export const getUser = async (req, res) => {
   await User.findById(req.params.id)
     .exec()
     .then((user) => {
-      if (user !== null) {
-        res.status(200).json(user);
-      } else {
-        res.sendStatus(404);
-      }
+      if (user === null) res.sendStatus(404);
+      res.status(200).json(user);
     })
     .catch((err) => {
       logger.error(err);
@@ -93,17 +42,14 @@ export const getUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   const id = req.params.id;
 
-  const password = req.body.password;
-  if (!password) delete req.body.password;
-  else req.body.password = await bcrypt.hash(password, 10);
-
   await User.findByIdAndUpdate(id, req.body, { returnDocument: "after" })
     .select("+password")
     .exec()
-    .then((newUser) => {
-      let newUserJson = newUser.toJSON();
-      delete newUserJson.password;
-      res.status(200).json(newUserJson);
+    .then((updatedUser) => {
+      if (!updatedUser) return res.sendStatus("404");
+      const userWithoutPassword = updatedUser.toObject();
+      delete userWithoutPassword.password;
+      res.status(200).json(updatedUser);
     })
     .catch((err) => {
       if (err.code === 11000) {
@@ -171,5 +117,3 @@ const duplicateErrorObj = (err) => {
     },
   };
 };
-
-export default User;

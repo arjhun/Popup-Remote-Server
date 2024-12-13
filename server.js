@@ -2,64 +2,44 @@
 
 import config from "./server.config.js";
 
+
 //logger
 import logger from "./logger.js";
+
+logger.trace(config, "Starting server with the following config:");
+
+if (!config.auth.secret) {
+  logger.fatal("Please provide a secret key for tokens");
+  process.exit(1);
+}
 
 //db
 import mongoose from "mongoose";
 
 //servers
 import express from "express";
-import { Server } from "socket.io";
 import { createServer } from "http";
+import { Server } from "socket.io";
 
 //auth
 import jwt from "jsonwebtoken";
 
 //middleware
-import ExpressBruteFlexible from "rate-limiter-flexible/lib/ExpressBruteFlexible.js";
-import { validateRequest, processRequest } from "zod-express-middleware";
-import { z } from "zod";
-import { userSchema, passwordSchema } from "./models/UserApiSchemas.js";
 import cors from "cors";
 import { expressjwt } from "express-jwt";
 import * as lt from "long-timeout";
 
+import { checkToken } from "./middlewares/auth.mw.js";
+
 //models and controllers
-import Session, {
-  getSessions,
-  addSession,
-  getSession,
-  updateSession,
-  deleteSession,
-  orderPopups,
-} from "./models/SessionModel.js";
-
-import User, {
-  createUser,
-  getUser,
-  getUsers,
-  updateUser,
-  deleteUser,
-  activateUser,
-  ROLES,
-  ROLES_VALUES,
-  changeRole,
-} from "./models/UserModel.js";
-
-import {
-  createDefaultAdmin,
-  authenticate,
-  refresh,
-  verifyPassword,
-} from "./Auth.js";
-
-import {
-  updatePasswordByToken,
-  sendPasswordToken,
-} from "./models/TokenModel.js";
 
 import { pinoHttp } from "pino-http";
+import authRouter from "./api/auth/auth.routes.js";
+import { createDefaultAdmin } from "./api/auth/auth.utils.js";
+import Session from "./api/sessions/session.model.js";
+import sessionRouter from "./api/sessions/session.routes.js";
+import User from "./api/users/users.model.js";
+import userRouter from "./api/users/users.routes.js";
 
 const reqLogger = pinoHttp({ logger: logger, useLevel: "debug" });
 
@@ -97,14 +77,9 @@ async function startServer() {
   logger.info(`cors origin set to: ${config.server.corsUrls}`);
 
   // serve the socket server;
-  server.listen(config.socket.port, () => {
-    logger.info(`Socket.io listening on port ${config.socket.port}`);
+  server.listen(config.server.port, () => {
+    logger.info(`Socket.io listening on port ${config.server.port}`);
   });
-
-  var bruteforce = new ExpressBruteFlexible(
-    ExpressBruteFlexible.LIMITER_TYPES.MEMORY,
-    { freeRetries: 10 }
-  );
 
   //global middleware
   app.use(reqLogger);
@@ -117,220 +92,20 @@ async function startServer() {
       secret: config.auth.secret,
       algorithms: ["HS256"],
     }).unless({
-      path: ["/", "/authenticate", "/refresh", "/reset-password"],
+      path: [
+        "/",
+        "/authenticate",
+        "/refresh",
+        "/reset-password",
+        "/verify-account",
+      ],
     })
   );
 
-  app.use(function (err, req, res, next) {
-    const date = new Date().toLocaleString();
-    if (err.name === "UnauthorizedError") {
-      logger.error(
-        `${date}: error: UnauthorizedError, method: ${req.method}, url: ${req.url} ,ip: ${req.ip}`
-      );
-      return res
-        .status(401)
-        .send("invalid token...Refresh token or contact your admin!");
-    }
-    next(err);
-  });
-
-  // custom middleware
-
-  const onlyAdmin = (req, res, next) => {
-    if (req.auth.role !== ROLES.ADMIN) return res.sendStatus(403);
-    next();
-  };
-
-  const onlyAdminAndOwner = (req, res, next) => {
-    if (req.auth.role !== ROLES.ADMIN) {
-      if (req.params.id !== req.auth.id) return res.sendStatus(403);
-    }
-    next();
-  };
-
-  //routes
-
-  app.get("/", (req, res) => {
-    res.sendFile("index.html");
-  });
-
-  app.post(
-    "/authenticate",
-    bruteforce.prevent,
-    validateRequest({
-      body: z.object({
-        username: z.string(),
-        password: z.string(),
-      }),
-    }),
-    authenticate
-  );
-
-  app.post(
-    "/refresh",
-    bruteforce.prevent,
-    validateRequest({
-      body: z.object({
-        refreshToken: z.string(),
-      }),
-    }),
-    refresh
-  );
-
-  app.post(
-    "/reset-password",
-    bruteforce.prevent,
-    validateRequest({
-      body: z.object({
-        email: z.string().email(),
-      }),
-    }),
-    sendPasswordToken
-  );
-
-  app.put(
-    "/reset-password",
-    bruteforce.prevent,
-    validateRequest({
-      body: z.object({
-        token: z.string(),
-        tokenId: z.string(),
-        password: z.string(),
-      }),
-    }),
-    updatePasswordByToken
-  );
-
-  app.get("/users", onlyAdmin, getUsers);
-
-  app.post(
-    "/users",
-    processRequest({
-      body: z.object(userSchema).partial(),
-    }),
-    onlyAdmin,
-    createUser
-  );
-
-  app.get(
-    "/users/:id",
-    validateRequest({
-      params: z.object({
-        id: z.string(),
-      }),
-    }),
-    onlyAdminAndOwner,
-    getUser
-  );
-
-  app.put(
-    "/users/:id",
-    processRequest({
-      params: z.object({
-        id: z.string(),
-      }),
-      body: z.object({ ...userSchema, ...passwordSchema }).partial(),
-    }),
-    onlyAdminAndOwner,
-    verifyPassword,
-    updateUser
-  );
-
-  app.put(
-    "/users/:id/active",
-    processRequest({
-      params: z.object({
-        id: z.string(),
-      }),
-      body: z.object({ active: z.boolean() }),
-    }),
-    onlyAdmin,
-    activateUser
-  );
-
-  app.put(
-    "/users/:id/role",
-    processRequest({
-      params: z.object({
-        id: z.string(),
-      }),
-      body: z.object({ role: z.enum(ROLES_VALUES) }),
-    }),
-    onlyAdmin,
-    changeRole
-  );
-
-  app.delete(
-    "/users/:id",
-    validateRequest({
-      params: z.object({
-        id: z.string(),
-      }),
-    }),
-    onlyAdmin,
-    deleteUser
-  );
-
-  //session api routes
-  app.get("/sessions", getSessions);
-
-  app.post(
-    "/sessions",
-    validateRequest({
-      body: z.object({
-        title: z.string(),
-      }),
-    }),
-    onlyAdmin,
-    addSession
-  );
-
-  app.get(
-    "/sessions/:id",
-    validateRequest({
-      params: z.object({
-        id: z.string(),
-      }),
-    }),
-    getSession
-  );
-
-  app.put(
-    "/sessions/:id",
-    validateRequest({
-      params: z.object({
-        id: z.string(),
-      }),
-      body: z.object({
-        title: z.string().nonempty(),
-      }),
-    }),
-    onlyAdmin,
-    updateSession
-  );
-
-  app.put(
-    "/sessions/:id/order",
-    validateRequest({
-      params: z.object({
-        id: z.string(),
-      }),
-      body: z.object({
-        orderArray: z.object({ _id: z.string(), order: z.number() }).array(),
-      }),
-    }),
-    orderPopups
-  );
-
-  app.delete(
-    "/sessions/:id",
-    validateRequest({
-      params: z.object({
-        id: z.string(),
-      }),
-    }),
-    deleteSession
-  );
+  app.use(checkToken);
+  app.use("/", authRouter);
+  app.use("/users", userRouter);
+  app.use("/sessions", sessionRouter);
 
   //begin socket.io API for remote clients
 
@@ -343,7 +118,7 @@ async function startServer() {
           socket.handshake.auth.token,
           config.auth.secret,
           function (err, decoded) {
-            if (err) return next(new Error(err));
+            if (err || !decoded) return next(new Error(err.message));
             socket.decoded = decoded;
             //disconnect when jwt expires
             const expiresIn = (decoded.exp - Date.now() / 1000) * 1000;
@@ -385,6 +160,7 @@ async function startServer() {
 
       socket.on("sortPopups", (sessionId, reducedArray, callBack) => {
         Session.findById(sessionId).then((session) => {
+          if (!session || !reducedArray) return;
           reducedArray.forEach((popup) => {
             session.popups.id(popup._id).order = popup.order;
           });
@@ -426,6 +202,7 @@ async function startServer() {
 
       socket.on("deletePopup", async (sessionId, popupId, callBack) => {
         await Session.findById(sessionId).then((session) => {
+          if (session == null) return;
           session.popups.remove(session.popups.id(popupId));
           session.save().then((savedSession) => {
             socket.broadcast.emit("deletePopup", savedSession._id, popupId);

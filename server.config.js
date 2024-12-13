@@ -1,5 +1,6 @@
 //env
 import * as dotenv from "dotenv";
+
 dotenv.config();
 
 const config = {
@@ -17,11 +18,12 @@ const config = {
     corsUrls: process.env.CORS_STR
       ? process.env.CORS_STR.split(" ")
       : ["http://localhost:3000"],
+    port: process.env.SERVERPORT || 3005,
   },
-  socket: { port: process.env.SERVERPORT || 3005 },
   auth: {
-    secret: process.env.SECRET_KEY, //* please use an enviroment variable
-    resetAdmin: process.env.RESET_ADMIN.toLowerCase() === "true" || false,
+    secret: process.env.SECRET_KEY || "", //* please use an enviroment variable
+    resetAdmin:
+      (process.env.RESET_ADMIN || "false").toLowerCase() === "true" || false,
     accessTokenExpiration: "1 day",
     refreshTokenExpiration: "30 days",
   },
