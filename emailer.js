@@ -110,11 +110,8 @@ const emailer = {
       }
     );
   },
-  /**
-   *
-   */
   checkConnection: function () {
-    // verify connection configuration
+    // verify connection configuration, mainly for logging, but added return
     transporter.verify(function (error, success) {
       if (error)
         logger.error(
@@ -123,10 +120,12 @@ const emailer = {
         );
       if (success) {
         logger.info("SMTP server responded, ready to send email!");
-        return succes;
       }
+      return success;
     });
   },
 };
+
+emailer.checkConnection();
 
 export default emailer;
