@@ -33,7 +33,7 @@ transporter.use("compile", hbs(options));
 // async..await is not allowed in global scope, must use a wrapper
 
 const emailer = {
-  /**
+   /**
    *A wrapper function
    * @param {string} email
    * @param {string} subject
@@ -90,7 +90,7 @@ const emailer = {
    *
    * @param {string} email
    */
-  sendEmailNotFoundMail: async function (email){
+  sendEmailNotFoundMail: async function (email) {
     this.sendEmailTo(email, "Password Reset requested", "password_wrong_email");
   },
   /**
@@ -99,12 +99,20 @@ const emailer = {
    * @param {string} name
    * @param {string} activation_link
    */
-  sendEmailVerifyMail: async function(email, name, activation_link) {
-    this.sendEmailTo(email, "Welcome! Please activate your account!","verify_new_user", {
-      name: name,
-      link: activation_link,
-    });
+  sendEmailVerifyMail: async function (email, name, activation_link) {
+    this.sendEmailTo(
+      email,
+      "Welcome! Please activate your account!",
+      "verify_new_user",
+      {
+        name: name,
+        link: activation_link,
+      }
+    );
   },
+  /**
+   *
+   */
   checkConnection: function () {
     // verify connection configuration
     transporter.verify(function (error, success) {
