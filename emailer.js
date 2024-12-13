@@ -1,8 +1,8 @@
+import "dotenv/config.js";
 import nodemailer from "nodemailer";
 import hbs from "nodemailer-express-handlebars";
-import "dotenv/config.js";
-import config from "./server.config.js";
 import logger from "./logger.js";
+import config from "./server.config.js";
 
 // create reusable transporter object using the default SMTP transport
 let transporter = nodemailer.createTransport({
