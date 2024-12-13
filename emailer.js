@@ -33,14 +33,14 @@ transporter.use("compile", hbs(options));
 // async..await is not allowed in global scope, must use a wrapper
 
 const emailer = {
-    /**
+  /**
    *A wrapper function
    * @param {string} email
    * @param {string} subject
    * @param {string} template
    * @param {object} context
    */
-   sendEmailTo: async (email, subject, template, context = {}) => {
+  sendEmailTo: async (email, subject, template, context = {}) => {
     const from = `"${config.email.fromName}" <${config.email.fromEmail}>`,
       mailOptions = {
         from: from, // sender address
@@ -49,11 +49,15 @@ const emailer = {
         template: template,
         context: { subject: subject, email: email, ...context },
       };
-     
-      transporter.sendMail(mailOptions, (err, info)=>{
-        if(err)logger.error({ template: template, error: err }, "Sending email failed!");
-        logger.trace(info);
-      });
+
+    transporter.sendMail(mailOptions, (err, info) => {
+      if (err)
+        logger.error(
+          { template: template, error: err },
+          "Sending email failed!"
+        );
+      logger.trace(info);
+    });
   },
   /**
    *
