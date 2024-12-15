@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import emailer from "../../emailer.js";
 import logger from "../../logger.js";
 import User from "./users.model.js";
@@ -41,6 +42,10 @@ export const getUser = async (req, res) => {
 
 export const updateUser = async (req, res) => {
   const id = req.params.id;
+
+  const password = req.body.password;
+  if (!password) delete req.body.password;
+  else req.body.password = await bcrypt.hash(password, 10);
 
   await User.findByIdAndUpdate(id, req.body, { returnDocument: "after" })
     .select("+password")

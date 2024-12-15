@@ -64,22 +64,23 @@ export const authenticate = async (req, res) => {
         failedLogin({ reason: reason, userInfo });
         return res.sendStatus(401);
       }
-      //user exists check password
-      bcrypt.compare(password, user.password, function (err, result) {
+
+      bcrypt.compare(password, user.password, function (err, match) {
         //wrong password
-        if (!result) {
+        if (err) logger.error(err);
+        if (match) {
+          //succesfull login! Reset authInfo.
+          user.authInfo.failedLogins = 0;
+          user.authInfo.lastLoggin = Date.now();
+          logger.info(userInfo, "Successfully authenticated!");
+          const tokens = createTokens(user);
+          return res.status(201).json(tokens);
+        } else {
           user.authInfo.failedLogins += 1;
           failedLogin({ reason: "Wrong password!", userInfo });
-          return res.sendStatus(401);
+          res.sendStatus(401);
         }
-        //succesfull login! Reset authInfo.
-        user.authInfo.failedLogins = 0;
-        user.authInfo.lastLoggin = Date.now();
-
-        logger.info(userInfo, "Successfully authenticated!");
-        const tokens = createTokens(user);
         user.save();
-        return res.status(201).json(tokens);
       });
     })
     .catch((error) => {

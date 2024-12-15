@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import logger from "../../logger.js";
 import config from "../../server.config.js";
 //auth
@@ -17,12 +18,18 @@ export const createDefaultAdmin = async () => {
     strict: true,
   });
 
-   await User.findOneAndUpdate(
+  bcrypt.hash(password, 10, async function (err, hash) {
+    if (err) {
+      logger.error(err);
+      return;
+    }
+
+    await User.findOneAndUpdate(
       { username: "admin" },
       {
         name: "administrator",
         email: "admin@example.org",
-        password: password,
+        password: hash,
         role: ROLES.ADMIN,
         authInfo: {
           isVerified: true,
@@ -42,6 +49,7 @@ export const createDefaultAdmin = async () => {
       .catch((error) => {
         logger.error(error);
       });
+  });
 };
 
 export const createTokens = (user) => {
