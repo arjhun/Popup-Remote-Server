@@ -24,8 +24,9 @@ socket.on("hide", function () {
 });
 
 function setContent(popup) {
-  if (popup?.title)
+  if (popup.title)
     $title.html(`<span class=" glow">${popup.title}</span> asked:`);
+  else $title.html("");
   $content.text(popup.content);
 }
 
