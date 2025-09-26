@@ -1,6 +1,6 @@
 # ==== CONFIGURE =====
-# Use a Node 16 base image
-FROM node:18-alpine 
+# Use a Node 22 base image
+FROM node:22-alpine 
 # Set the working directory to /app inside the container
 WORKDIR /app
 # Copy app files
