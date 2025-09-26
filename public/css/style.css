@@ -16,17 +16,8 @@ p{
     margin-bottom: 2rem;
 }
 
-.glow{
-    color: white; /* Basiskleur van de tekst */
-    text-shadow: 
-      0 0 5px rgba(255, 255, 255, 0.753),  /* Kleine gloed */
-      0 0 10px rgba(255, 255, 255, 0.753), /* Middelgrote gloed */
-      0 0 20px rgba(255, 255, 255, 0.753), /* Grotere gloed */
-      0 0 40px rgba(255, 255, 255, 0.753); /* Diepere gloed */
-}
-
 .popup{
-    border-radius: 2rem;
+    border-radius: 3rem;
     font-size: 1.75em;
     position: fixed;
     left: 50%;
@@ -34,17 +25,27 @@ p{
     transform: translate(-50%, 0);
     margin: 0 0 -600px auto;
     bottom: 10px;
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Noto Sans', sans-serif;
     background-color: rgb(55, 55, 55);
 }
 
-.popupContent{
+.popup .popupContent{
     padding: 0 2rem 0 2rem;
+    font-weight: 400;
+}
+
+.popup #title{
+    font-size: 1.2em;
+    
+}
+
+#title .title-content{
+    font-weight: 700;
 }
 
 .popup::before{
     font-size: 1.75em;
-    font-weight: 200;
+    font-weight: 500;
     content: "Q:";
     text-align: center;
     line-height: 120px;

@@ -2,7 +2,6 @@
 
 import config from "./server.config.js";
 
-
 //logger
 import logger from "./logger.js";
 
@@ -46,12 +45,21 @@ const reqLogger = pinoHttp({ logger: logger, useLevel: "debug" });
 const app = express();
 const server = createServer(app);
 
+server.on("error", (e) => {
+  if (e.code === "EADDRINUSE") {
+    logger.warn("Address in use, retrying...");
+    setTimeout(() => {
+      startServer();
+    }, 10000);
+  }
+});
+
 //connect to mongoose
 await mongoose
   .connect(config.db.connString)
-  .then(() => {
+  .then(async () => {
     logger.info(`Connected to mongoose @ ${config.db.connString}`);
-    startServer().catch((error) => {
+    await startServer().catch((error) => {
       logger.error(error);
     });
   })
